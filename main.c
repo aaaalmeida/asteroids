@@ -6,7 +6,7 @@
 #define TARGET_FPS 60
 #define SCREEN_WIDTH 800 
 #define SCREEN_HEIGTH 600
-#define PLAYER_SIZE 20
+#define PLAYER_SIZE 80
 #define INITIAL_PLAYER_SPEED 2
 #define INITIAL_ANGLE 270
 #define INITIAL_PLAYER_ROTATION_SPEED 1
@@ -68,6 +68,8 @@ int main(void) {
 }
 
 void drawPlayer() {
+    // TODO: delete direction indicator
+    /*
     int lineThickness = 4;
     DrawCircleLinesV(player.position, player.size, RAYWHITE);
     DrawLineEx(
@@ -78,6 +80,17 @@ void drawPlayer() {
             lineThickness, 
             RAYWHITE
         );
+*/
+
+    // I dont know what this is for :P
+    int segments = 100;
+
+    DrawCircleSectorLines(player.position,
+            player.size, 
+            player.angle + (((5*PI)/6) * RAD2DEG), 
+            player.angle + (((7*PI)/6) * RAD2DEG), 
+            segments, 
+            RAYWHITE);
 }
 
 void handlePlayerInput() {
@@ -120,7 +133,7 @@ int GetRandomProjectileAngle() {
 }
 
 void shootBackward(int angle) {
-    int projectileRange = 300;
+    int projectileRange = 200;
     int projectileThickness = 3;
     
     DrawLineEx(player.position, (Vector2){
