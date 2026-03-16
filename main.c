@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <math.h>
+#include <time.h>
 #include "raylib.h"
 
+#define TARGET_FPS 60
 #define SCREEN_WIDTH 600 
 #define SCREEN_HEIGTH 600
 #define PLAYER_SIZE 20
@@ -29,13 +31,19 @@ void drawPlayer();
 void handlePlayerInput();
 bool didCollideWithWall(); 
 void shoot();
+void shootBackward();
 
 int main(void) {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGTH, "asteroids");
-    SetTargetFPS(60);
+    SetTargetFPS(TARGET_FPS);
+
+    int frameCounter = 0;
 
     while (!WindowShouldClose()) {
         BeginDrawing();
+        
+        frameCounter++;
+        if (frameCounter >= TARGET_FPS) frameCounter = 0;
 
         drawPlayer();
         handlePlayerInput();
@@ -50,19 +58,30 @@ int main(void) {
 }
 
 void drawPlayer() {
+    int lineThickness = 4;
     DrawCircleLinesV(player.position, player.size, RAYWHITE);
-    DrawLineEx(player.position, (Vector2){player.position.x + (player.size * cosf(player.angle * DEG2RAD)), player.position.y + (player.size * sinf(player.angle * DEG2RAD))}, 4, RAYWHITE);
+    DrawLineEx(
+            player.position, 
+            (Vector2){
+                player.position.x + (player.size * cosf(player.angle * DEG2RAD)), 
+                player.position.y + (player.size * sinf(player.angle * DEG2RAD))}, 
+            lineThickness, 
+            RAYWHITE
+        );
 }
 
 void handlePlayerInput() {
+    // using module so player angle doesnt scape float scope
     if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)){
-        player.angle -= player.speed_rotation;
+        //player.angle -= player.speed_rotation;
+        player.angle = (int)(player.angle - player.speed_rotation) % 360;
     }
     else if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)){
-        player.angle += player.speed_rotation;
+        //player.angle += player.speed_rotation;
+        player.angle = (int)(player.angle + player.speed_rotation) % 360;
     }
-    else if (IsKeyPressed(KEY_SPACE)) shoot();
-    else if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) {
+
+    if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) {
         // FIXME: consertar colisao com parede
         //if (!didCollideWithWall())
             player.position = (Vector2){
@@ -70,6 +89,8 @@ void handlePlayerInput() {
                 player.position.y + (sinf(player.angle * DEG2RAD) * player.speed)
             };
     }
+
+    if (IsKeyPressed(KEY_SPACE)) shootBackward();
 }
 
 bool didCollideWithWall() {
@@ -80,6 +101,21 @@ bool didCollideWithWall() {
 }
 
 void shoot() {
+    DrawLineEx(player.position, (Vector2){cosf(player.angle*DEG2RAD)}, 5, RAYWHITE);
     DrawCircleV(player.position, 5, GREEN);
+}
+
+void shootBackward() {
+    float inverseAngle = player.angle - 180;
+    int projectileRange = 100;
+    int projectileThickness = 5;
+
+    SetRandomSeed(time(NULL));
+    int randomProjectileAngle = GetRandomValue(inverseAngle - 30, inverseAngle + 30);
+
+    DrawLineEx(player.position, (Vector2){
+            player.position.x + cosf(randomProjectileAngle * DEG2RAD) * projectileRange,
+            player.position.y + sinf(randomProjectileAngle * DEG2RAD) * projectileRange},
+            projectileThickness, RAYWHITE);
 }
 
