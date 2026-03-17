@@ -1,30 +1,56 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <stdlib.h>
 #include "raylib.h"
 
 #define TARGET_FPS 60
-#define SCREEN_WIDTH 800 
-#define SCREEN_HEIGTH 600
-#define PLAYER_SIZE 80
+#define SCREEN_WIDTH 1000 
+#define SCREEN_HEIGTH 650
+#define PLAYER_SIZE 40
 #define INITIAL_PLAYER_SPEED 2
 #define INITIAL_ANGLE 270
 #define INITIAL_PLAYER_ROTATION_SPEED 1
 
-void drawPlayer();
-void handlePlayerInput();
-void shoot();
-void shootBackward(int angle);
-bool didCollideWithWall(); 
-int GetRandomProjectileAngle();
+typedef struct {
+    Vector2 position;
+    float direction;
+    float size;
+} Asteroid;
 
-typedef struct Player {
+typedef struct {
     Vector2 position;
     float size; // radius
     float angle; // degrees
     float speed;
     float speed_rotation;
 } Player;
+
+// ----- PLAYER -----
+void drawPlayer();
+void handlePlayerInput();
+void shootBackward(int angle);
+bool didCollideWithWall(); 
+int getRandomProjectileAngle();
+// ------------------
+
+
+// ----- ASTEROID -----
+Asteroid createNewAsteroid();
+void drawAsteroid(Asteroid);
+void updateAsteroid(Asteroid*);
+// --------------------
+
+// ----- UTIL -----
+float randomFloatRange(float min, float max);
+// ----------------
+
+/*
+typedef struct {
+    Asteroid *asteroid;
+    AsteroidNode *next;
+} AsteroidNode;
+*/
 
 Player player = {
     (Vector2){SCREEN_WIDTH/2, SCREEN_HEIGTH/2},
@@ -40,7 +66,9 @@ int main(void) {
 
     int frameCounter = 0;
     int projectileDuration = 0;
-    int projectileAngle = GetRandomProjectileAngle();
+    int projectileAngle = getRandomProjectileAngle();
+
+    Asteroid asteroid = createNewAsteroid();
 
     while (!WindowShouldClose()) {
         BeginDrawing();
@@ -51,12 +79,17 @@ int main(void) {
         drawPlayer();
         handlePlayerInput();
         
+        updateAsteroid(&asteroid);
+        drawAsteroid(asteroid);
+        printf("pos %f %f\n", asteroid.position.x, asteroid.position.y);
+        /*
         projectileDuration++;
         if (projectileDuration < TARGET_FPS * 1.5) shootBackward(projectileAngle);
         else {
             projectileDuration = 0;
-            projectileAngle = GetRandomProjectileAngle();
+            projectileAngle = getRandomProjectileAngle();
         }
+        */
 
         ClearBackground(BLACK);
         EndDrawing();
@@ -109,8 +142,6 @@ void handlePlayerInput() {
             player.position.x + (cosf(player.angle * DEG2RAD) * player.speed),
             player.position.y + (sinf(player.angle * DEG2RAD) * player.speed)};
     }
-
-    //if (IsKeyPressed(KEY_SPACE)) shootBackward();
 }
 
 bool didCollideWithWall() {
@@ -120,12 +151,7 @@ bool didCollideWithWall() {
             CheckCollisionCircleLine(player.position, player.size, (Vector2){SCREEN_HEIGTH, 0}, (Vector2){SCREEN_HEIGTH, SCREEN_WIDTH});
 }
 
-void shoot() {
-    //DrawLineEx(player.position, (Vector2){cosf(player.angle*DEG2RAD)}, 5, RAYWHITE);
-    //DrawCircleV(player.position, 5, GREEN);
-}
-
-int GetRandomProjectileAngle() {
+int getRandomProjectileAngle() {
     float inverseAngle = player.angle - 180;
     int angleRange = 10;
     SetRandomSeed(time(NULL));
@@ -142,3 +168,27 @@ void shootBackward(int angle) {
             projectileThickness, RAYWHITE);
 }
 
+Asteroid createNewAsteroid() {
+    int radius = GetRandomValue(20, 50);
+    float minAngle = -0.5;
+    float maxAngle = 0.5;
+    float direction = randomFloatRange(minAngle, maxAngle);
+
+    printf("r%d d%f\n", radius, direction);
+    // TODO: generate support in a random place near walls
+    return (Asteroid) {(Vector2){radius, radius}, direction, radius};
+}
+
+void drawAsteroid(Asteroid asteroid) {
+    DrawCircleLinesV(asteroid.position, asteroid.size, GREEN);
+}
+
+void updateAsteroid(Asteroid* asteroid) {
+    //TODO: check if asteroid have been shot   
+    asteroid->position = (Vector2){asteroid->position.x + cosf(asteroid->direction), asteroid->position.y + sinf(asteroid->direction)};
+}
+
+float randomFloatRange(float min, float max) {
+    srand(time(NULL));
+    return min + ((rand()/(float) RAND_MAX) * (max - min));
+}
