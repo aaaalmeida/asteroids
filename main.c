@@ -7,17 +7,15 @@
 #define TARGET_FPS 60
 #define SCREEN_WIDTH 1000 
 #define SCREEN_HEIGTH 650
-#define PLAYER_SIZE 40
-#define INITIAL_PLAYER_SPEED 2
+#define PLAYER_SIZE 60
 #define INITIAL_ANGLE 270
+#define SHIP_ANGLE 15
+
+//TODO: change player speed as the game progress
+#define INITIAL_PLAYER_SPEED 2
 #define INITIAL_PLAYER_ROTATION_SPEED 1
 
-typedef struct {
-    Vector2 position;
-    float direction;
-    float size;
-} Asteroid;
-
+// ----- PLAYER -----
 typedef struct {
     Vector2 position;
     float size; // radius
@@ -26,31 +24,36 @@ typedef struct {
     float speed_rotation;
 } Player;
 
-// ----- PLAYER -----
 void drawPlayer();
 void handlePlayerInput();
 void shootBackward(int angle);
 bool didCollideWithWall(); 
-int getRandomProjectileAngle();
-// ------------------
-
+float getRandomProjectileAngle();
 
 // ----- ASTEROID -----
+typedef struct {
+    Vector2 position;
+    float direction;
+    float size;
+    float speed;
+} Asteroid;
+
+typedef struct AsteroidNode{
+    Asteroid* asteroid;
+    struct AsteroidNode* next;
+} AsteroidNode;
+
 Asteroid createNewAsteroid();
-void drawAsteroid(Asteroid);
+AsteroidNode* createNewAsteroidNode();
+void drawAsteroid(Asteroid*);
+void drawAllAsteroids(AsteroidNode* head);
 void updateAsteroid(Asteroid*);
-// --------------------
+void updateAllAsteroids(AsteroidNode* head);
+void destroyAsteroidNode(AsteroidNode* target, AsteroidNode* before);
 
 // ----- UTIL -----
 float randomFloatRange(float min, float max);
-// ----------------
-
-/*
-typedef struct {
-    Asteroid *asteroid;
-    AsteroidNode *next;
-} AsteroidNode;
-*/
+void log(char*);
 
 Player player = {
     (Vector2){SCREEN_WIDTH/2, SCREEN_HEIGTH/2},
@@ -60,15 +63,19 @@ Player player = {
     INITIAL_PLAYER_ROTATION_SPEED
 };
 
+AsteroidNode* asteroidListHead = NULL;
+
 int main(void) {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGTH, "asteroids");
     SetTargetFPS(TARGET_FPS);
 
     int frameCounter = 0;
-    int projectileDuration = 0;
-    int projectileAngle = getRandomProjectileAngle();
 
-    Asteroid asteroid = createNewAsteroid();
+    asteroidListHead = (AsteroidNode*) malloc(sizeof(AsteroidNode));
+    asteroidListHead = createNewAsteroidNode();
+
+    int projectileDuration = 0;
+    float projectileAngle = getRandomProjectileAngle();
 
     while (!WindowShouldClose()) {
         BeginDrawing();
@@ -78,50 +85,37 @@ int main(void) {
 
         drawPlayer();
         handlePlayerInput();
-        
-        updateAsteroid(&asteroid);
-        drawAsteroid(asteroid);
-        printf("pos %f %f\n", asteroid.position.x, asteroid.position.y);
-        /*
+
         projectileDuration++;
         if (projectileDuration < TARGET_FPS * 1.5) shootBackward(projectileAngle);
         else {
             projectileDuration = 0;
             projectileAngle = getRandomProjectileAngle();
         }
-        */
+
+        updateAllAsteroids(asteroidListHead);
+        drawAllAsteroids(asteroidListHead);
 
         ClearBackground(BLACK);
         EndDrawing();
     }
     
+    //TODO: free asteroid list
+
     CloseWindow();
 
     return 0;
 }
 
 void drawPlayer() {
-    // TODO: delete direction indicator
-    /*
-    int lineThickness = 4;
-    DrawCircleLinesV(player.position, player.size, RAYWHITE);
-    DrawLineEx(
-            player.position, 
-            (Vector2){
-                player.position.x + (player.size * cosf(player.angle * DEG2RAD)), 
-                player.position.y + (player.size * sinf(player.angle * DEG2RAD))}, 
-            lineThickness, 
-            RAYWHITE
-        );
-*/
-
-    // I dont know what this is for :P
-    int segments = 100;
-
-    DrawCircleSectorLines(player.position,
+    int segments = 1;
+    DrawCircleSectorLines(
+            player.position,
             player.size, 
-            player.angle + (((5*PI)/6) * RAD2DEG), 
-            player.angle + (((7*PI)/6) * RAD2DEG), 
+            //player.angle + (((5*PI)/6) * RAD2DEG), 
+            //player.angle + (((7*PI)/6) * RAD2DEG), 
+            (player.angle - 180) + SHIP_ANGLE, 
+            (player.angle - 180) - SHIP_ANGLE,
             segments, 
             RAYWHITE);
 }
@@ -151,11 +145,15 @@ bool didCollideWithWall() {
             CheckCollisionCircleLine(player.position, player.size, (Vector2){SCREEN_HEIGTH, 0}, (Vector2){SCREEN_HEIGTH, SCREEN_WIDTH});
 }
 
-int getRandomProjectileAngle() {
+float randomFloatRange(float min, float max) {
+    srand(time(NULL));
+    return min + ((rand()/(float) RAND_MAX) * (max - min));
+}
+
+float getRandomProjectileAngle() {
     float inverseAngle = player.angle - 180;
     int angleRange = 10;
-    SetRandomSeed(time(NULL));
-    return GetRandomValue(inverseAngle - angleRange, inverseAngle + angleRange);
+    return randomFloatRange(inverseAngle - angleRange, inverseAngle + angleRange);
 }
 
 void shootBackward(int angle) {
@@ -169,26 +167,52 @@ void shootBackward(int angle) {
 }
 
 Asteroid createNewAsteroid() {
-    int radius = GetRandomValue(20, 50);
+    int radius = (int) randomFloatRange(20, 50);
+    float speed = randomFloatRange(0, 1);
     float minAngle = -0.5;
     float maxAngle = 0.5;
     float direction = randomFloatRange(minAngle, maxAngle);
 
-    printf("r%d d%f\n", radius, direction);
     // TODO: generate support in a random place near walls
-    return (Asteroid) {(Vector2){radius, radius}, direction, radius};
+    return (Asteroid) {(Vector2){radius, radius}, direction, radius, speed};
 }
 
-void drawAsteroid(Asteroid asteroid) {
-    DrawCircleLinesV(asteroid.position, asteroid.size, GREEN);
+AsteroidNode* createNewAsteroidNode() {
+    Asteroid asteroid = createNewAsteroid();
+    AsteroidNode node = { &asteroid, NULL };
+    node.next = (AsteroidNode*) malloc(sizeof(AsteroidNode));
+    return &node; 
+}
+
+void destroyAsteroidNode(AsteroidNode* target, AsteroidNode* before) {
+    before->next = target->next;
+    free(target);
+}
+
+void drawAsteroid(Asteroid* asteroid) {
+    DrawCircleLinesV(asteroid->position, asteroid->size, GREEN);
+}
+
+void drawAllAsteroids(AsteroidNode* head) {
+    drawAsteroid(head->asteroid);
+    if (head->next) drawAllAsteroids(head->next);
 }
 
 void updateAsteroid(Asteroid* asteroid) {
+    //TODO: check collision with wall
     //TODO: check if asteroid have been shot   
-    asteroid->position = (Vector2){asteroid->position.x + cosf(asteroid->direction), asteroid->position.y + sinf(asteroid->direction)};
+    asteroid->position = (Vector2){
+        (asteroid->position.x + cosf(asteroid->direction)) * asteroid->speed,
+        (asteroid->position.y + sinf(asteroid->direction)) * asteroid->speed};
 }
 
-float randomFloatRange(float min, float max) {
-    srand(time(NULL));
-    return min + ((rand()/(float) RAND_MAX) * (max - min));
+void updateAllAsteroids(AsteroidNode* head) {
+    updateAsteroid(head->asteroid);
+    log("UPDATE ALL ASTEROIDS");
+    if (head->next) updateAllAsteroids(head->next);
 }
+
+void log(char *msg) {
+    printf("\n[INFO] %s", msg);
+}
+

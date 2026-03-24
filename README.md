@@ -1,3 +1,9 @@
+# Asteroids
+
+---
+TODO: add a gif demo
+---
+
 ## dependencies
 * [raylib](https://github.com/raysan5/raylib)
 * any C compiler
